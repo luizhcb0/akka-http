@@ -4,3 +4,4 @@ target
 *.zip
 node_modules
 /www
+.idea
