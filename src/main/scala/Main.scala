@@ -60,7 +60,9 @@ object Main extends App with Directives with JsonSupport {
           val js = parse(json)
           println(json)
           val sender = (js \\ "sender" \ "id").values
+          val mid = "m_" + (js \\ "mid").values
           println(sender)
+          println(mid)
           if (sender != None) {
             val uri = s"https://graph.facebook.com/${sender}?fields=id,name&access_token=${pageAccessToken}"
             println(uri)
