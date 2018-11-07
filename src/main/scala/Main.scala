@@ -27,6 +27,8 @@ trait JsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
 object Main extends App with Directives with JsonSupport {
 
+  val userFields = "name,email,hometown,id,gender,birthday,picture"
+  val messageFields = "from,id,to,message"
   val token = "AnyStringToken"
   val secret = "08829edb4d005149ba0935c62f78276a"
   val appId = "284511972397990"
@@ -42,7 +44,7 @@ object Main extends App with Directives with JsonSupport {
   def getMessageInfo(mid: String): Unit = {
     val p = Promise[String]()
     val f = p.future
-    val uri = s"https://graph.facebook.com/${mid}?fields=from,id,to,message&access_token=${pageAccessToken}"
+    val uri = s"https://graph.facebook.com/${mid}?fields=${messageFields}&access_token=${pageAccessToken}"
     println(uri)
     val producer = Future {
       val response: scalaj.http.HttpResponse[String] = scalaj.http.Http(uri).asString
@@ -70,10 +72,10 @@ object Main extends App with Directives with JsonSupport {
     val from = (js \\ "from").values.toString
     val to = (js \\ "to").values.toString
     if (from != appPSID) {
-      uri = s"https://graph.facebook.com/${from}?fields=name,id,gender&access_token=${pageAccessToken}"
+      uri = s"https://graph.facebook.com/${from}?fields=${userFields}&access_token=${pageAccessToken}"
     }
     else {
-      uri = s"https://graph.facebook.com/${to}?fields=name,id,gender&access_token=${pageAccessToken}"
+      uri = s"https://graph.facebook.com/${to}?fields=${userFields}&access_token=${pageAccessToken}"
     }
     println(uri)
     val futureGet = Future {
@@ -110,10 +112,11 @@ object Main extends App with Directives with JsonSupport {
       path("webhook") {
         entity(as[String]) { json =>
           val js = parse(json)
-          println(js)
-          val mid = "m_" + (js \\ "mid").values.toString
-          println(mid)
-          if (mid != None) {
+          println(json)
+          val midVal = (js \\ "message" \ "mid").values
+          if (midVal != None) {
+            val mid = "m_" + midVal
+            println(mid)
             val str = getMessageInfo(mid)
 //            enrichUser(str)
           }else {

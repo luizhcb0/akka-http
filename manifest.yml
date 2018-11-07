@@ -1,0 +1,7 @@
+---
+applications:
+- name: bb-rest-webhook
+  random-route: true
+  memory: 256M
+  path: target/scala-2.12/akka-http-0.1.jar
+
