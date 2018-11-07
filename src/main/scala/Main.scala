@@ -27,7 +27,7 @@ trait JsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
 
 object Main extends App with Directives with JsonSupport {
 
-  val userFields = "name,email,hometown,id,gender,birthday,picture"
+  val userFields = "name,email,hometown,id,gender,birthday,picture,family,work,friends.limit(0)"
   val messageFields = "from,id,to,message"
   val token = "AnyStringToken"
   val secret = "08829edb4d005149ba0935c62f78276a"
@@ -41,11 +41,31 @@ object Main extends App with Directives with JsonSupport {
 
   implicit val executionContext = system.dispatcher
 
-  def getMessageInfo(mid: String): Unit = {
+  def getPostInfo(json: String): Unit = {
+
+    // Get User PSID
+    val js = parse(json)
+    val userId = (js \\ "value" \ "from" \ "id").values
+    println(userId)
+    enrichUser(userId.toString)
+  }
+
+  def getMessageInfo(json: String): Unit = {
     val p = Promise[String]()
     val f = p.future
+
+    // Get MID Value
+    val js = parse(json)
+    val midVal = (js \\ "message" \ "mid").values
+    val mid = "m_" + midVal
+    println(mid)
+
+
+    // Build URI
     val uri = s"https://graph.facebook.com/${mid}?fields=${messageFields}&access_token=${pageAccessToken}"
     println(uri)
+
+
     val producer = Future {
       val response: scalaj.http.HttpResponse[String] = scalaj.http.Http(uri).asString
       p success response.body
@@ -54,30 +74,29 @@ object Main extends App with Directives with JsonSupport {
       f foreach { response =>
         val js = parse(response)
         println(response)
+        val from = (js \\ "from" \ "id").values
+        val to = ((js \\ "to" \ "data") (0) \ "id").values
         var str = "{"
-        str += "\"from\":\"" + (js \\ "from" \ "id").values + "\","
-        str += "\"to\":\"" + ((js \\ "to" \ "data") (0) \ "id").values + "\","
+        str += "\"from\":\"" + from + "\","
+        str += "\"to\":\"" + to + "\","
         str += "\"message\":\"" + (js \\ "message").values + "\","
         str += "\"mid\":\"%s\"".format(mid)
         str += "}"
         println(str)
-        enrichUser(str)
+        if (from != appPSID) {
+          enrichUser(from.toString)
+        }
+        else {
+          enrichUser(to.toString)
+        }
       }
     }
   }
 
-  def enrichUser(str: String): Unit = {
-    var uri: String = ""
-    val js = parse(str)
-    val from = (js \\ "from").values.toString
-    val to = (js \\ "to").values.toString
-    if (from != appPSID) {
-      uri = s"https://graph.facebook.com/${from}?fields=${userFields}&access_token=${pageAccessToken}"
-    }
-    else {
-      uri = s"https://graph.facebook.com/${to}?fields=${userFields}&access_token=${pageAccessToken}"
-    }
+  def enrichUser(userId: String): Unit = {
+    var uri: String = s"https://graph.facebook.com/${userId}?fields=${userFields}&access_token=${pageAccessToken}"
     println(uri)
+
     val futureGet = Future {
       val response: scalaj.http.HttpResponse[String] = scalaj.http.Http(uri).asString
       response.body
@@ -90,6 +109,28 @@ object Main extends App with Directives with JsonSupport {
     }
   }
 
+  def getMessageType(json: String): String = {
+    var messageType: String = ""
+
+    val js = parse(json)
+    println(json)
+
+    val message = (js \\ "message" \ "mid").values
+    val feed = (js \\ "field").values
+
+    if (message != None) {
+      messageType = "messenger"
+    }
+    else if (feed != None) {
+      messageType = "feed"
+    }
+    else {
+      messageType = "unknown"
+    }
+    println(messageType)
+    return messageType
+  }
+
 
   val routes: Route =
     get {
@@ -100,9 +141,6 @@ object Main extends App with Directives with JsonSupport {
         parameters("hub.challenge") { (`hub.challenge`) =>
           complete(`hub.challenge`)
         }
-      } ~
-      path("crash") {
-        complete("BOOM!")
       }
     } ~
     post {
@@ -111,16 +149,10 @@ object Main extends App with Directives with JsonSupport {
       } ~
       path("webhook") {
         entity(as[String]) { json =>
-          val js = parse(json)
-          println(json)
-          val midVal = (js \\ "message" \ "mid").values
-          if (midVal != None) {
-            val mid = "m_" + midVal
-            println(mid)
-            val str = getMessageInfo(mid)
-//            enrichUser(str)
-          }else {
-            println("Webhook nao proveniente do messenger")
+          val messageType: Unit = getMessageType(json) match {
+            case "feed" => getPostInfo(json)
+            case "messenger" => getMessageInfo(json)
+            case _ => println("Webhook nao tratavel atualmente")
           }
           complete(s"{Seu objeto: \n ${json}}")
         }
