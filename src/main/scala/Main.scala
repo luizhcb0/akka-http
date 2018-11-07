@@ -116,7 +116,7 @@ object Main extends App with Directives with JsonSupport {
     println(json)
 
     val message = (js \\ "message" \ "mid").values
-    val feed = (js \\ "field").values
+    val feed = (js \\ "changes" \ "field").values
 
     if (message != None) {
       messageType = "messenger"
