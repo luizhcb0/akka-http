@@ -81,12 +81,12 @@ class MessageHandler {
     println(json)
 
     val message = (js \\ "message" \ "mid").values
-    val feed = (js \\ "changes" \ "field").values
+    val feed = ((js \\ "changes")(0) \ "field").values
 
     if (message != None) {
       messageType = "messenger"
     }
-    else if (feed != None) {
+    else if (feed == "feed") {
       messageType = "feed"
     }
     else {
